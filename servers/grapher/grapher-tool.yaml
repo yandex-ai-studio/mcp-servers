@@ -1,0 +1,163 @@
+tool:
+  name: draw_graph
+  description: >
+    Render bar, line, or pie chart and return `image_url`.
+    Response format is controlled by function environment variable `mode` (`inline` or `bucket`).
+    In `inline` mode, `image_url` is a data URL with base64 payload.
+    In `bucket` mode, `image_url` is a public Object Storage URL.
+    Payload must include graph_type and data object that match one of the chart-specific contracts.
+  function_call:
+    function_id: REPLACE_WITH_FUNCTION_ID
+    tag: $latest
+  input_json_schema:
+    type: object
+    description: >
+      Graph render request.
+      Short samples:
+      bar: {"graph_type":"bar","data":{"labels":["A","B"],"values":[10,15]}}
+      line: {"graph_type":"line","data":{"x_values":[2022,2023],"y_values":[120,160]}}
+      pie: {"graph_type":"pie","data":{"labels":["Desktop","Mobile"],"values":[55,45]}}
+    properties:
+      graph_type:
+        type: string
+        description: >
+          Graph type to render.
+          Allowed values:
+          - bar: categorical bars
+          - line: trend line
+          - pie: proportion chart
+        enum: [bar, line, pie]
+      data:
+        type: object
+        description: >
+          Graph data object. Required fields depend on graph_type.
+          See anyOf branches for chart-specific schemas and constraints.
+      options:
+        type: object
+        description: >
+          Optional render settings.
+          Example: {"title":"Sales by category","xlabel":"Category","ylabel":"Sales","width":10,"height":6,"dpi":100}
+          Defaults:
+          - title: "Graph"
+          - width: 10
+          - height: 6 (8 for pie)
+          - dpi: 100
+          Notes:
+          - xlabel and ylabel are mainly used for bar/line.
+          - width/height must be positive numbers.
+          - dpi must be a positive integer.
+        properties:
+          title:
+            type: string
+            description: Chart title. Default is "Graph".
+          xlabel:
+            type: string
+            description: X-axis label, mainly for bar and line charts.
+          ylabel:
+            type: string
+            description: Y-axis label, mainly for bar and line charts.
+          width:
+            type: number
+            minimum: 0.000001
+            description: Figure width in inches. Must be > 0. Default is 10.
+          height:
+            type: number
+            minimum: 0.000001
+            description: Figure height in inches. Must be > 0. Default is 6, and 8 for pie.
+          dpi:
+            type: integer
+            minimum: 1
+            description: Image resolution DPI. Must be positive integer. Default is 100.
+    required: [graph_type, data]
+    anyOf:
+      - type: object
+        description: >
+          Bar chart input contract.
+          Sample:
+          {"graph_type":"bar","data":{"labels":["A","B","C"],"values":[10,15,7]}}
+        properties:
+          graph_type:
+            const: bar
+          data:
+            type: object
+            properties:
+              labels:
+                type: array
+                minItems: 1
+                description: Category labels. Must contain non-empty strings.
+                items:
+                  type: string
+                  minLength: 1
+              values:
+                type: array
+                minItems: 1
+                description: Numeric values for each label.
+                items:
+                  type: number
+            required: [labels, values]
+            description: >
+              Bar data object.
+              Runtime rule: labels and values arrays must have the same length.
+      - type: object
+        description: >
+          Line chart input contract.
+          Sample:
+          {"graph_type":"line","data":{"x_values":[2022,2023,2024],"y_values":[120,160,210]}}
+        properties:
+          graph_type:
+            const: line
+          data:
+            type: object
+            properties:
+              x_values:
+                type: array
+                minItems: 1
+                description: >
+                  X-axis values.
+                  Runtime rule: values must be homogeneous (all numbers or all non-empty strings).
+                items:
+                  anyOf:
+                    - type: number
+                    - type: string
+                      minLength: 1
+              y_values:
+                type: array
+                minItems: 1
+                description: Y-axis numeric values.
+                items:
+                  type: number
+            required: [x_values, y_values]
+            description: >
+              Line data object.
+              Runtime rule: x_values and y_values arrays must have the same length.
+      - type: object
+        description: >
+          Pie chart input contract.
+          Sample:
+          {"graph_type":"pie","data":{"labels":["Desktop","Mobile","Tablet"],"values":[55,35,10]}}
+        properties:
+          graph_type:
+            const: pie
+          data:
+            type: object
+            properties:
+              labels:
+                type: array
+                minItems: 1
+                description: Segment labels. Must contain non-empty strings.
+                items:
+                  type: string
+                  minLength: 1
+              values:
+                type: array
+                minItems: 1
+                description: >
+                  Segment values.
+                  Runtime rules: each value must be non-negative, and sum(values) must be > 0.
+                items:
+                  type: number
+                  minimum: 0
+            required: [labels, values]
+            description: >
+              Pie data object.
+              Runtime rule: labels and values arrays must have the same length.

@@ -1,0 +1,15 @@
+function_name: mcp-grapher-cfunc
+service_account_id: ...
+runtime: python314
+entrypoint: index.handler
+memory: 512m
+timeout: 30s
+source_dir: func
+include_files:
+  - index.py
+  - requirements.txt
+environment:
+  mode: "inline"
+  static_key_id: "..."
+  static_key_secret: "..."
+  bucket: "..."

@@ -1,0 +1,43 @@
+tool:
+  name: draw_image
+  description: >
+    Generate an image with YandexART from a text prompt and return `image_url`.
+    Response format is controlled by function environment variable `mode` (`inline` or `bucket`).
+    In `inline` mode, `image_url` is a data URL with base64 payload.
+    In `bucket` mode, `image_url` is a public Object Storage URL.
+    Credentials may be provided in request payload or preconfigured as function environment variables.
+  function_call:
+    function_id: REPLACE_WITH_FUNCTION_ID
+    tag: $latest
+  input_json_schema:
+    type: object
+    description: >
+      YandexART image generation request.
+      Minimal sample:
+      {"prompt":"A futuristic city skyline at sunset"}
+      With explicit credentials:
+      {"prompt":"A futuristic city skyline at sunset","folder_id":"b1g...","api_key":"AQVN..."}
+      With custom ratio:
+      {"prompt":"Cyberpunk street at night","folder_id":"b1g...","api_key":"AQVN...","width_ratio":16,"height_ratio":9}
+    properties:
+      prompt:
+        type: string
+        minLength: 1
+        description: Text prompt for image generation.
+      folder_id:
+        type: string
+        minLength: 1
+        description: Optional Yandex Cloud folder ID. If omitted, function uses YART_FOLDER_ID from environment.
+      api_key:
+        type: string
+        minLength: 1
+        description: Optional API key for Yandex AI Studio. If omitted, function uses YART_API_KEY from environment.
+      width_ratio:
+        type: integer
+        minimum: 1
+        description: Optional width ratio. Must be a positive integer. Default is 1.
+      height_ratio:
+        type: integer
+        minimum: 1
+        description: Optional height ratio. Must be a positive integer. Default is 1.
+    required: [prompt]

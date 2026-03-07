@@ -1,0 +1,30 @@
+tool:
+  name: search_arxiv
+  description: Search arXiv papers by keyword with field and sorting options.
+  function_call:
+    function_id: REPLACE_WITH_FUNCTION_ID
+    tag: $latest
+  input_json_schema:
+    type: object
+    properties:
+      query:
+        type: string
+        description: Keyword query.
+      field:
+        type: string
+        description: Search field.
+        enum: [all, title, abstract, author]
+      max_results:
+        type: integer
+        description: Maximum number of returned papers.
+        minimum: 1
+        maximum: 25
+      sort_by:
+        type: string
+        description: Sorting dimension.
+        enum: [relevance, submittedDate, lastUpdatedDate]
+      sort_order:
+        type: string
+        description: Sorting order.
+        enum: [ascending, descending]
+    required: [query]

@@ -1,0 +1,3 @@
+yandex-ai-studio-sdk
+Pillow
+boto3>=1.34.0

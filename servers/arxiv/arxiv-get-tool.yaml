@@ -1,0 +1,13 @@
+tool:
+  name: get_paper_details
+  description: Get full metadata for one paper by arXiv ID.
+  function_call:
+    function_id: REPLACE_WITH_FUNCTION_ID
+    tag: $latest
+  input_json_schema:
+    type: object
+    properties:
+      arxiv_id:
+        type: string
+        description: Paper arXiv ID, for example 1706.03762 or arXiv:1706.03762.
+    required: [arxiv_id]

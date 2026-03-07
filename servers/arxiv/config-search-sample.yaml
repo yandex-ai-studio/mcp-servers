@@ -1,0 +1,10 @@
+function_name: mcp-arxiv-search
+service_account_id: REPLACE_WITH_SERVICE_ACCOUNT_ID
+runtime: python314
+entrypoint: index.handler
+memory: 256m
+timeout: 20s
+source_dir: func-search
+include_files:
+  - index.py
+  - requirements.txt
