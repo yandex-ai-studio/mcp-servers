@@ -54,9 +54,28 @@ function Get-ConfigValue {
     if ($Override) {
         return $Override
     }
-    $value = $ConfigObject.$Key
+    $value = Get-ObjectValue -Object $ConfigObject -Key $Key
     if ($value -is [string] -and $value.Trim()) {
         return $value.Trim()
+    }
+    return $null
+}
+
+function Get-ObjectValue {
+    param(
+        [object]$Object,
+        [string]$Key
+    )
+    if ($null -eq $Object) {
+        return $null
+    }
+    if ($Object -is [System.Collections.IDictionary]) {
+        return $Object[$Key]
+    }
+
+    $property = $Object.PSObject.Properties[$Key]
+    if ($property) {
+        return $property.Value
     }
     return $null
 }
@@ -153,6 +172,66 @@ function Get-EnvironmentArgs {
     return $args
 }
 
+function Get-MountArgs {
+    param([object]$MountsConfig)
+
+    $args = @()
+    if ($null -eq $MountsConfig) {
+        return $args
+    }
+
+    $mountIndex = 0
+    foreach ($mount in @($MountsConfig)) {
+        if ($null -eq $mount) {
+            continue
+        }
+
+        $mountIndex += 1
+        $bucketRaw = [string](Get-ObjectValue -Object $mount -Key "bucket")
+        $mountPointRaw = [string](Get-ObjectValue -Object $mount -Key "mount_point")
+        $prefixRaw = [string](Get-ObjectValue -Object $mount -Key "prefix")
+        $typeRaw = [string](Get-ObjectValue -Object $mount -Key "type")
+        $modeRaw = [string](Get-ObjectValue -Object $mount -Key "mode")
+
+        $bucket = $bucketRaw.Trim()
+        $mountPoint = $mountPointRaw.Trim()
+        $prefix = $prefixRaw.Trim()
+        $type = $typeRaw.Trim()
+        $mode = $modeRaw.Trim().ToLowerInvariant()
+
+        if (-not $bucket) {
+            throw "mounts[$mountIndex].bucket is required"
+        }
+        if (-not $mountPoint) {
+            throw "mounts[$mountIndex].mount_point is required"
+        }
+        if (-not $type) {
+            $type = "object-storage"
+        }
+        if (-not $mode) {
+            $mode = "ro"
+        }
+        if ($mode -notin @("ro", "rw")) {
+            throw "mounts[$mountIndex].mode must be 'ro' or 'rw'"
+        }
+
+        $mountSpecParts = @(
+            "type=$type",
+            "mount-point=$mountPoint",
+            "bucket=$bucket"
+        )
+        if ($prefix) {
+            $mountSpecParts += "prefix=$prefix"
+        }
+        $mountSpecParts += "mode=$mode"
+
+        $args += "--mount"
+        $args += ($mountSpecParts -join ",")
+    }
+
+    return $args
+}
+
 Require-Command -Name yc
 
 $configPath = Resolve-Path -LiteralPath $Config
@@ -174,22 +253,24 @@ if (-not $timeoutResolved) { $timeoutResolved = "20s" }
 if (-not $functionNameResolved) { throw "function_name is required (config or -FunctionName)." }
 if (-not $serviceAccountIdResolved) { throw "service_account_id is required (config or -ServiceAccountId)." }
 
-$sourceDirRaw = [string]$cfg.source_dir
+$sourceDirRaw = [string](Get-ObjectValue -Object $cfg -Key "source_dir")
 if (-not $sourceDirRaw.Trim()) {
     $sourceDirRaw = "."
 }
 $sourceDirResolved = Resolve-Path -LiteralPath (Join-Path $configDir $sourceDirRaw)
 
 $includeFiles = @()
-if ($cfg.include_files) {
-    foreach ($f in $cfg.include_files) {
+$includeFilesConfig = Get-ObjectValue -Object $cfg -Key "include_files"
+if ($includeFilesConfig) {
+    foreach ($f in $includeFilesConfig) {
         $includeFiles += [string]$f
     }
 }
 if ($includeFiles.Count -eq 0) {
     $includeFiles = @("index.py", "requirements.txt")
 }
-$environmentArgs = Get-EnvironmentArgs -EnvironmentConfig $cfg.environment
+$environmentArgs = @(Get-EnvironmentArgs -EnvironmentConfig (Get-ObjectValue -Object $cfg -Key "environment"))
+$mountArgs = @(Get-MountArgs -MountsConfig (Get-ObjectValue -Object $cfg -Key "mounts"))
 
 Write-Host "Ensuring function '$functionNameResolved' exists..."
 & yc serverless function get --name $functionNameResolved *> $null
@@ -216,6 +297,9 @@ try {
     if ($environmentArgs.Count -gt 0) {
         $versionCreateArgs += $environmentArgs
     }
+    if ($mountArgs.Count -gt 0) {
+        $versionCreateArgs += $mountArgs
+    }
     Invoke-Yc $versionCreateArgs
 }
 finally {
@@ -233,3 +317,6 @@ Write-Host "Function info:"
 Write-Host "  yc serverless function get --name $functionNameResolved"
 Write-Host "Latest version info:"
 Write-Host "  yc serverless function version list --function-name $functionNameResolved"
+
+
+

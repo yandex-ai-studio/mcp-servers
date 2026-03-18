@@ -1,0 +1,22 @@
+function_name: mcp-markdownpdf-cfunc
+service_account_id: ...
+runtime: python312
+entrypoint: index.handler
+memory: 512m
+timeout: 60s
+source_dir: func
+include_files:
+  - index.py
+  - requirements.txt
+mounts:
+  - bucket: sysbucket
+    prefix: fonts
+    mount_point: fonts
+    type: object-storage
+    mode: ro
+environment:
+  mode: "inline"
+  MARKDOWNPDF_FONT_DIR: "/function/storage/fonts"
+  static_key_id: "..."
+  static_key_secret: "..."
+  bucket: "..."

@@ -55,5 +55,18 @@ Deploy MCP gateway (uses local `yart-tool.yaml` by default):
 
 ```powershell
 cd NEW_ROOT\servers\yandexart
-.\mcpdeploy.ps1 --gateway-name yandexart
+.\mcpdeploy.ps1 --gateway-name yandexart --env-file .env
 ```
+
+`mcpdeploy.ps1` requires MCP gateway deployment settings:
+- `FOLDER_ID`
+- `SERVICE_ACCOUNT_ID`
+
+Provide them either as environment variables or in `.env` in this directory:
+
+```dotenv
+FOLDER_ID=b1gxxxxxxxxxxxxxxx
+SERVICE_ACCOUNT_ID=ajexxxxxxxxxxxxxxx
+```
+
+Authentication is resolved from `IAM_TOKEN`, then `yc iam create-token`, then `API_KEY`.

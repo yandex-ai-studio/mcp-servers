@@ -1,0 +1,25 @@
+tool:
+  name: render_markdown_pdf
+  description: >
+    Render Markdown into PDF and return `pdf_url`.
+    Response format is controlled by function environment variable `mode` (`inline` or `bucket`).
+    In `inline` mode, `pdf_url` is a data URL with base64 payload.
+    In `bucket` mode, `pdf_url` is a public Object Storage URL.
+    The function reads DejaVu Sans fonts from a mounted bucket directory configured by `MARKDOWNPDF_FONT_DIR`.
+  function_call:
+    function_id: PUT_FUNCTION_ID_HERE
+    tag: $latest
+  input_json_schema:
+    type: object
+    description: >
+      Markdown-to-PDF render request.
+      Minimal sample:
+      {"markdown":"# Hello\n\nThis is a PDF."}
+      Cyrillic sample:
+      {"markdown":"# Привет\n\nЭто тестовый PDF-документ."}
+    properties:
+      markdown:
+        type: string
+        minLength: 1
+        description: Markdown text to render into a PDF document.
+    required: [markdown]

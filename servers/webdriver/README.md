@@ -104,11 +104,24 @@ If you need the steps separately:
 ```powershell
 cd NEW_ROOT\servers\webdriver
 .\containerdeploy.ps1
-.\mcpdeploy.ps1 --spec .\webdriver-tool.yaml --gateway-name webdriver
+.\mcpdeploy.ps1 --spec .\webdriver-tool.yaml --gateway-name webdriver --env-file .env
 ```
 
 The separate `mcpdeploy.ps1` flow only works after replacing the placeholder URL in `webdriver-tool.yaml`.
 `installdeploy.ps1` handles that automatically without modifying the tracked spec template.
+
+Direct MCP gateway deployment with `mcpdeploy.ps1` requires:
+- `FOLDER_ID`
+- `SERVICE_ACCOUNT_ID`
+
+Provide them either as environment variables or in `.env` in this directory:
+
+```dotenv
+FOLDER_ID=b1gxxxxxxxxxxxxxxx
+SERVICE_ACCOUNT_ID=ajexxxxxxxxxxxxxxx
+```
+
+Authentication is resolved from `IAM_TOKEN`, then `yc iam create-token`, then `API_KEY`.
 
 ## Operational Notes
 
@@ -116,4 +129,3 @@ The separate `mcpdeploy.ps1` flow only works after replacing the placeholder URL
 - HTML and screenshot output can make responses large and slower.
 - Chromium cold starts will be higher than the function-backed servers in this repo.
 - Each request processes URLs sequentially inside one browser instance and reports partial failures.
-

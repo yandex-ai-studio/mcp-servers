@@ -19,6 +19,8 @@ Each MCP gateway tool forwards requests to one or more Yandex Cloud backends:
   Generates images with YandexART and returns `image_url` (inline data URL or bucket URL).
 - [Grapher](servers/grapher/README.md)  
   Renders bar/line/pie charts and returns `image_url` (inline data URL or bucket URL).
+- [MarkdownPDF](servers/markdownpdf/README.md)  
+  Renders Markdown into PDF and returns `pdf_url` (inline data URL or bucket URL).
 - [arXiv](servers/arxiv/README.md)  
   Provides search and paper-details tools via two cloud functions under one gateway.
 - [Webdriver](servers/webdriver/README.md)  
@@ -30,16 +32,30 @@ Prerequisites:
 - `yc` CLI configured for target cloud/folder
 - access to service account IDs, backend IDs/URLs in specs, and auth values for MCP deploy
 
+MCP gateway deploy prerequisites:
+- `deploy\mcpdeploy.ps1` requires `FOLDER_ID` and `SERVICE_ACCOUNT_ID`
+- these values may be provided via environment variables or an `.env` file passed with `--env-file`
+- authentication for the MCP API is resolved from `IAM_TOKEN`, then `yc iam create-token`, then `API_KEY`
+
+Minimal `.env` example for MCP gateway deployment:
+
+```dotenv
+FOLDER_ID=b1gxxxxxxxxxxxxxxx
+SERVICE_ACCOUNT_ID=ajexxxxxxxxxxxxxxx
+```
+
 Typical flow per function-backed server:
 
 1. Configure function settings in server `config.yaml` (and arXiv `config-search.yaml` + `config-get.yaml`).
+   Shared function deploy config also supports a top-level `mounts` array for Object Storage mounts.
 2. Deploy function(s):
    - `servers\yandexart\funcdeploy.ps1`
    - `servers\grapher\funcdeploy.ps1`
+   - `servers\markdownpdf\funcdeploy.ps1`
    - `servers\arxiv\funcdeploy.ps1`
 3. Update tool spec function IDs if needed.
 4. Deploy MCP gateway from server directory:
-   - `.\mcpdeploy.ps1 --gateway-name <gateway-name>`
+   - `.\mcpdeploy.ps1 --gateway-name <gateway-name> --env-file .env`
 
 For the browser-backed webdriver server, use the container install flow instead:
 
@@ -48,3 +64,14 @@ For the browser-backed webdriver server, use the container install flow instead:
    - `servers\webdriver\installdeploy.ps1 --gateway-name webdriver`
 
 Wrappers in each server call shared scripts in `deploy\` using relative path `..\..\deploy`.
+
+Function mount config shape:
+
+```yaml
+mounts:
+  - bucket: sysbucket
+    prefix: fonts
+    mount_point: fonts
+    type: object-storage
+    mode: ro
+```
