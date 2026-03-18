@@ -1,0 +1,12 @@
+{
+  "container_name": "mcp-webdriver",
+  "container_id": "bba018pdtqcul9mnqbna",
+  "container_url": "https://bba018pdtqcul9mnqbna.containers.yandexcloud.net/",
+  "image_url": "cr.yandex/crpg68d300p82btnacno/webdriver:latest",
+  "registry_name": "mcp-registry",
+  "registry_id": "crpg68d300p82btnacno",
+  "repository_name": "webdriver",
+  "revision_id": "bbaott78df8jr8s8dpmh",
+  "revision_status": "ACTIVE",
+  "service_account_id": "ajem4f8s1tldjihe3jjs"
+}

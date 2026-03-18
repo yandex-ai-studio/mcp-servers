@@ -3,7 +3,7 @@ Set-StrictMode -Version Latest
 
 $DEFAULT_MCP_API_BASE_URL = "https://serverless-mcp-gateway.api.cloud.yandex.net/mcpgateway/v1"
 $DEFAULT_OPERATION_API_BASE_URL = "https://operation.api.cloud.yandex.net/operations"
-$DEFAULT_GATEWAY_DESCRIPTION = "arXiv MCP server backed by separate search and get cloud functions."
+$DEFAULT_GATEWAY_DESCRIPTION = "MCP server deployed from local tool specs."
 
 function Show-Usage {
     Write-Host "Usage:"
@@ -298,11 +298,109 @@ function Read-Spec {
 function Require-NonEmptyString {
     param([object]$Container, [string]$Key, [string]$Context)
 
-    $value = $Container.$Key
+    $value = Get-ObjectPropertyValue -Obj $Container -Name $Key
     if (-not ($value -is [string]) -or -not $value.Trim()) {
         throw "$Context.$Key must be a non-empty string"
     }
     return $value.Trim()
+}
+
+function Get-ObjectPropertyValue {
+    param(
+        [object]$Obj,
+        [string]$Name
+    )
+
+    if ($null -eq $Obj) {
+        return $null
+    }
+    if ($Obj -is [System.Collections.IDictionary]) {
+        if ($Obj.Contains($Name)) {
+            return $Obj[$Name]
+        }
+        return $null
+    }
+
+    $prop = $Obj.PSObject.Properties[$Name]
+    if ($null -eq $prop) {
+        return $null
+    }
+    return $prop.Value
+}
+
+function Get-OptionalNonEmptyString {
+    param([object]$Container, [string]$Key)
+
+    $value = Get-ObjectPropertyValue -Obj $Container -Name $Key
+    if (-not ($value -is [string])) {
+        return $null
+    }
+
+    $trimmed = $value.Trim()
+    if (-not $trimmed) {
+        return $null
+    }
+    return $trimmed
+}
+
+function Convert-ToStringMap {
+    param(
+        [object]$Value,
+        [string]$Context
+    )
+
+    if ($null -eq $Value) {
+        return $null
+    }
+
+    if ($Value -is [string] -or $Value -is [ValueType]) {
+        throw "$Context must be an object/map"
+    }
+
+    $map = @{}
+    if ($Value -is [System.Collections.IDictionary]) {
+        $entries = $Value.GetEnumerator()
+    }
+    else {
+        $entries = $Value.PSObject.Properties
+    }
+
+    foreach ($entry in $entries) {
+        if ($entry -is [System.Collections.DictionaryEntry]) {
+            $key = [string]$entry.Key
+            $rawValue = $entry.Value
+        }
+        else {
+            $key = [string]$entry.Name
+            $rawValue = $entry.Value
+        }
+
+        $key = $key.Trim()
+        if (-not $key) {
+            throw "$Context contains an empty key"
+        }
+        if ($null -eq $rawValue) {
+            continue
+        }
+
+        $map[$key] = [string]$rawValue
+    }
+
+    return $map
+}
+
+function Validate-HttpMethodValue {
+    param(
+        [string]$Method,
+        [string]$Context
+    )
+
+    $allowed = @("OPTIONS", "GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "TRACE", "CONNECT")
+    $normalized = $Method.Trim().ToUpperInvariant()
+    if ($allowed -notcontains $normalized) {
+        throw "$Context must be one of: $($allowed -join ', ')"
+    }
+    return $normalized
 }
 
 function Validate-ToolSpec {
@@ -320,12 +418,49 @@ function Validate-ToolSpec {
         throw "${Source}: tool.input_json_schema must be an object"
     }
 
-    $functionCall = $tool.function_call
-    if ($null -eq $functionCall) {
-        throw "${Source}: tool.function_call must be an object"
+    $actionKeys = @("function_call", "http_call", "container_call")
+    $presentActions = @()
+    foreach ($actionKey in $actionKeys) {
+        if ($null -ne (Get-ObjectPropertyValue -Obj $tool -Name $actionKey)) {
+            $presentActions += $actionKey
+        }
     }
-    [void](Require-NonEmptyString -Container $functionCall -Key "function_id" -Context "tool.function_call")
-    [void](Require-NonEmptyString -Container $functionCall -Key "tag" -Context "tool.function_call")
+    if ($presentActions.Count -eq 0) {
+        throw "${Source}: tool must define one action block: function_call, http_call, or container_call"
+    }
+    if ($presentActions.Count -gt 1) {
+        throw "${Source}: tool must define exactly one action block, found: $($presentActions -join ', ')"
+    }
+
+    $functionCall = Get-ObjectPropertyValue -Obj $tool -Name "function_call"
+    if ($null -ne $functionCall) {
+        [void](Require-NonEmptyString -Container $functionCall -Key "function_id" -Context "tool.function_call")
+        $tag = Get-OptionalNonEmptyString -Container $functionCall -Key "tag"
+        if ($null -ne $tag) {
+            [void]$tag
+        }
+        return
+    }
+
+    $httpCall = Get-ObjectPropertyValue -Obj $tool -Name "http_call"
+    if ($null -ne $httpCall) {
+        $method = Require-NonEmptyString -Container $httpCall -Key "method" -Context "tool.http_call"
+        [void](Require-NonEmptyString -Container $httpCall -Key "url" -Context "tool.http_call")
+        [void](Validate-HttpMethodValue -Method $method -Context "tool.http_call.method")
+        [void](Convert-ToStringMap -Value (Get-ObjectPropertyValue -Obj $httpCall -Name "headers") -Context "tool.http_call.headers")
+        [void](Convert-ToStringMap -Value (Get-ObjectPropertyValue -Obj $httpCall -Name "query") -Context "tool.http_call.query")
+        return
+    }
+
+    $containerCall = Get-ObjectPropertyValue -Obj $tool -Name "container_call"
+    if ($null -ne $containerCall) {
+        $method = Require-NonEmptyString -Container $containerCall -Key "method" -Context "tool.container_call"
+        [void](Require-NonEmptyString -Container $containerCall -Key "container_id" -Context "tool.container_call")
+        [void](Validate-HttpMethodValue -Method $method -Context "tool.container_call.method")
+        [void](Convert-ToStringMap -Value (Get-ObjectPropertyValue -Obj $containerCall -Name "headers") -Context "tool.container_call.headers")
+        [void](Convert-ToStringMap -Value (Get-ObjectPropertyValue -Obj $containerCall -Name "query") -Context "tool.container_call.query")
+        return
+    }
 }
 
 function Load-AndValidateSpecs {
@@ -366,17 +501,8 @@ function Build-ToolPayload {
         [object]$Tool
     )
 
-    $actionCallField = Get-FieldName -FieldStyle $FieldStyle -Camel "functionCall" -Snake "function_call"
-    $functionIdField = Get-FieldName -FieldStyle $FieldStyle -Camel "functionId" -Snake "function_id"
     $schemaField = Get-FieldName -FieldStyle $FieldStyle -Camel "inputJsonSchema" -Snake "input_json_schema"
-
-    $actionCall = @{
-        tag = $Tool.function_call.tag
-    }
-    $actionCall[$functionIdField] = $Tool.function_call.function_id
-
-    $action = @{}
-    $action[$actionCallField] = $actionCall
+    $action = Build-ActionPayload -FieldStyle $FieldStyle -Tool $Tool
 
     $payload = @{
         name = $Tool.name
@@ -385,6 +511,89 @@ function Build-ToolPayload {
     }
     $payload[$schemaField] = ConvertTo-CompactJson -Value $Tool.input_json_schema
     return $payload
+}
+
+function Build-ActionPayload {
+    param(
+        [string]$FieldStyle,
+        [object]$Tool
+    )
+
+    $functionCall = Get-ObjectPropertyValue -Obj $Tool -Name "function_call"
+    if ($null -ne $functionCall) {
+        $actionCallField = Get-FieldName -FieldStyle $FieldStyle -Camel "functionCall" -Snake "function_call"
+        $functionIdField = Get-FieldName -FieldStyle $FieldStyle -Camel "functionId" -Snake "function_id"
+
+        $actionCall = @{}
+        $actionCall[$functionIdField] = Get-ObjectPropertyValue -Obj $functionCall -Name "function_id"
+
+        $tag = Get-OptionalNonEmptyString -Container $functionCall -Key "tag"
+        if ($tag) {
+            $actionCall["tag"] = $tag
+        }
+
+        return @{
+            $actionCallField = $actionCall
+        }
+    }
+
+    $httpCall = Get-ObjectPropertyValue -Obj $Tool -Name "http_call"
+    if ($null -ne $httpCall) {
+        $actionCallField = Get-FieldName -FieldStyle $FieldStyle -Camel "httpCall" -Snake "http_call"
+        $useServiceAccountField = Get-FieldName -FieldStyle $FieldStyle -Camel "useServiceAccount" -Snake "use_service_account"
+
+        $actionCall = @{
+            url = Get-ObjectPropertyValue -Obj $httpCall -Name "url"
+            method = (Validate-HttpMethodValue -Method ([string](Get-ObjectPropertyValue -Obj $httpCall -Name "method")) -Context "tool.http_call.method")
+        }
+
+        $body = Get-OptionalNonEmptyString -Container $httpCall -Key "body"
+        if ($body) { $actionCall["body"] = $body }
+
+        $headers = Convert-ToStringMap -Value (Get-ObjectPropertyValue -Obj $httpCall -Name "headers") -Context "tool.http_call.headers"
+        if ($headers -and $headers.Count -gt 0) { $actionCall["headers"] = $headers }
+
+        $query = Convert-ToStringMap -Value (Get-ObjectPropertyValue -Obj $httpCall -Name "query") -Context "tool.http_call.query"
+        if ($query -and $query.Count -gt 0) { $actionCall["query"] = $query }
+
+        $useServiceAccount = Get-ObjectPropertyValue -Obj $httpCall -Name "use_service_account"
+        if ($null -ne $useServiceAccount) {
+            $actionCall[$useServiceAccountField] = [bool]$useServiceAccount
+        }
+
+        return @{
+            $actionCallField = $actionCall
+        }
+    }
+
+    $containerCall = Get-ObjectPropertyValue -Obj $Tool -Name "container_call"
+    if ($null -ne $containerCall) {
+        $actionCallField = Get-FieldName -FieldStyle $FieldStyle -Camel "containerCall" -Snake "container_call"
+        $containerIdField = Get-FieldName -FieldStyle $FieldStyle -Camel "containerId" -Snake "container_id"
+
+        $actionCall = @{
+            method = (Validate-HttpMethodValue -Method ([string](Get-ObjectPropertyValue -Obj $containerCall -Name "method")) -Context "tool.container_call.method")
+        }
+        $actionCall[$containerIdField] = Get-ObjectPropertyValue -Obj $containerCall -Name "container_id"
+
+        $path = Get-OptionalNonEmptyString -Container $containerCall -Key "path"
+        if ($path) { $actionCall["path"] = $path }
+
+        $body = Get-OptionalNonEmptyString -Container $containerCall -Key "body"
+        if ($body) { $actionCall["body"] = $body }
+
+        $headers = Convert-ToStringMap -Value (Get-ObjectPropertyValue -Obj $containerCall -Name "headers") -Context "tool.container_call.headers"
+        if ($headers -and $headers.Count -gt 0) { $actionCall["headers"] = $headers }
+
+        $query = Convert-ToStringMap -Value (Get-ObjectPropertyValue -Obj $containerCall -Name "query") -Context "tool.container_call.query"
+        if ($query -and $query.Count -gt 0) { $actionCall["query"] = $query }
+
+        return @{
+            $actionCallField = $actionCall
+        }
+    }
+
+    throw "Unsupported tool action"
 }
 
 function Build-CreatePayload {
@@ -580,14 +789,6 @@ function Main {
     }
 
     try {
-        $authHeader = Get-AuthHeader -Cfg $cfg
-    }
-    catch {
-        Write-Error $_.Exception.Message
-        exit 2
-    }
-
-    try {
         $loadedSpecs = @(Load-AndValidateSpecs -SpecPaths $argsParsed.Spec)
     }
     catch {
@@ -623,6 +824,14 @@ function Main {
         Write-Host "Dry run mode: first payload candidate (field_style=$($first.FieldStyle))"
         $first.Payload | ConvertTo-Json -Depth 100
         exit 0
+    }
+
+    try {
+        $authHeader = Get-AuthHeader -Cfg $cfg
+    }
+    catch {
+        Write-Error $_.Exception.Message
+        exit 2
     }
 
     try {

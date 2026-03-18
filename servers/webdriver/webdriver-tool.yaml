@@ -1,0 +1,49 @@
+tool:
+  name: fetch_web_pages
+  description: >
+    Fetch one or more public web pages in a real headless Chromium browser and return
+    the rendered page title and extracted text. Optional HTML and screenshot output can
+    be enabled by request and container policy.
+  http_call:
+    url: REPLACE_WITH_CONTAINER_URL
+    method: POST
+    body: '\( . )'
+    headers:
+      Content-Type: application/json
+    use_service_account: true
+  input_json_schema:
+    type: object
+    properties:
+      urls:
+        type: array
+        description: Absolute HTTP/HTTPS URLs to open in Chromium.
+        minItems: 1
+        maxItems: 5
+        items:
+          type: string
+          format: uri
+      timeout_ms:
+        type: integer
+        description: >
+          Per-page timeout in milliseconds. Default comes from the container environment.
+        minimum: 1
+      wait_until:
+        type: string
+        description: Navigation readiness state to wait for.
+        enum: [load, domcontentloaded, networkidle]
+      wait_for_selector:
+        type: string
+        description: Optional CSS selector to wait for after navigation.
+        minLength: 1
+      wait_after_load_ms:
+        type: integer
+        description: Additional fixed wait after navigation/selector completion in milliseconds.
+        minimum: 0
+      return_html:
+        type: boolean
+        description: Return rendered HTML when allowed by container configuration.
+      return_screenshot:
+        type: boolean
+        description: Return a full-page PNG screenshot encoded as base64 when allowed.
+    required: [urls]
+

@@ -1,0 +1,20 @@
+container_name: mcp-webdriver
+service_account_id: REPLACE_WITH_SERVICE_ACCOUNT_ID
+registry_name: mcp-registry
+repository_name: webdriver
+image_tag: latest
+memory: 2GB
+timeout: 90s
+concurrency: 1
+source_dir: container
+dockerfile: container/Dockerfile
+environment:
+  DEFAULT_TIMEOUT_MS: "15000"
+  DEFAULT_WAIT_UNTIL: "domcontentloaded"
+  DEFAULT_WAIT_AFTER_LOAD_MS: "1000"
+  MAX_URLS: "5"
+  RETURN_HTML_BY_DEFAULT: "false"
+  RETURN_SCREENSHOT_BY_DEFAULT: "false"
+  ALLOW_HTML: "true"
+  ALLOW_SCREENSHOT: "true"
+
