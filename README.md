@@ -25,6 +25,8 @@ Each MCP gateway tool forwards requests to one or more Yandex Cloud backends:
   Provides search and paper-details tools via two cloud functions under one gateway.
 - [Webdriver](servers/webdriver/README.md)  
   Fetches rendered web pages with Playwright/Chromium from a private serverless container.
+- [Weather](servers/weather/README.md)  
+  Queries OpenWeatherMap current weather, 5 day forecast, and city search by city name.
 
 ## Deployment Procedure
 

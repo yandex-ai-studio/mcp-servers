@@ -1,0 +1,40 @@
+tool:
+  name: find_weather_cities
+  description: >
+    Find matching OpenWeatherMap cities by name and return current weather for each
+    match. Useful for resolving ambiguous city names before calling weather tools.
+  http_call:
+    url: https://api.openweathermap.org/data/2.5/find
+    method: GET
+    query:
+      q: '\( .city )'
+      appid: REPLACE_WITH_OPENWEATHER_APPID
+      units: '\( .units // "" )'
+      lang: '\( .lang // "" )'
+      type: '\( .type // "" )'
+      cnt: '\( .cnt // "" )'
+  input_json_schema:
+    type: object
+    properties:
+      city:
+        type: string
+        minLength: 1
+        description: City name or partial city name to search for. Use English city names.
+      units:
+        type: string
+        description: Units of measurement. Defaults to OpenWeatherMap standard units.
+        enum: [standard, metric, imperial]
+      lang:
+        type: string
+        minLength: 2
+        description: Optional OpenWeatherMap language code for weather descriptions.
+      type:
+        type: string
+        description: OpenWeatherMap search mode. Defaults to OpenWeatherMap behavior.
+        enum: [like, accurate]
+      cnt:
+        type: integer
+        minimum: 1
+        maximum: 50
+        description: Optional maximum number of matching locations to return.
+    required: [city]

@@ -1,0 +1,30 @@
+tool:
+  name: get_current_weather
+  description: >
+    Get current weather for a city using OpenWeatherMap current weather data.
+  http_call:
+    url: https://api.openweathermap.org/data/2.5/weather
+    method: GET
+    query:
+      q: '\( .city )'
+      appid: REPLACE_WITH_OPENWEATHER_APPID
+      units: '\( .units // "" )'
+      lang: '\( .lang // "" )'
+  input_json_schema:
+    type: object
+    properties:
+      city:
+        type: string
+        minLength: 1
+        description: >
+          City name query. Country/state can be included using OpenWeatherMap syntax,
+          for example "London,GB" or "London,Ontario,CA". Use English city names.
+      units:
+        type: string
+        description: Units of measurement. Defaults to OpenWeatherMap standard units.
+        enum: [standard, metric, imperial]
+      lang:
+        type: string
+        minLength: 2
+        description: Optional OpenWeatherMap language code for weather descriptions.
+    required: [city]

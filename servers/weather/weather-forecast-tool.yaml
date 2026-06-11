@@ -1,0 +1,36 @@
+tool:
+  name: get_weather_forecast
+  description: >
+    Get a 5 day / 3 hour weather forecast for a city name using OpenWeatherMap.
+  http_call:
+    url: https://api.openweathermap.org/data/2.5/forecast
+    method: GET
+    query:
+      q: '\( .city )'
+      appid: REPLACE_WITH_OPENWEATHER_APPID
+      units: '\( .units // "" )'
+      lang: '\( .lang // "" )'
+      cnt: '\( .cnt // "" )'
+  input_json_schema:
+    type: object
+    properties:
+      city:
+        type: string
+        minLength: 1
+        description: >
+          City name query. Country/state can be included using OpenWeatherMap syntax,
+          for example "London,GB" or "London,Ontario,CA". Use English city names.
+      units:
+        type: string
+        description: Units of measurement. Defaults to OpenWeatherMap standard units.
+        enum: [standard, metric, imperial]
+      lang:
+        type: string
+        minLength: 2
+        description: Optional OpenWeatherMap language code for weather descriptions.
+      cnt:
+        type: integer
+        minimum: 1
+        maximum: 40
+        description: Optional number of forecast timestamps to return. Defaults to 40.
+    required: [city]
