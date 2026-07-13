@@ -1,0 +1,10 @@
+function_name: mcp-kaggle-search
+service_account_id: REPLACE_WITH_SERVICE_ACCOUNT_ID
+runtime: python314
+entrypoint: index.handler
+memory: 512m
+timeout: 30s
+source_dir: func-search
+include_files:
+  - index.py
+  - requirements.txt
