@@ -6,7 +6,8 @@ param(
     [string]$Runtime,
     [string]$Entrypoint,
     [string]$Memory,
-    [string]$Timeout
+    [string]$Timeout,
+    [hashtable]$EnvironmentOverrides
 )
 
 $ErrorActionPreference = "Stop"
@@ -132,41 +133,53 @@ function New-DeploymentArchive {
 }
 
 function Get-EnvironmentArgs {
-    param([object]$EnvironmentConfig)
+    param(
+        [object]$EnvironmentConfig,
+        [hashtable]$Overrides
+    )
 
     $args = @()
-    if (-not $EnvironmentConfig) {
-        return $args
-    }
+    $values = @{}
 
-    if ($EnvironmentConfig -is [System.Collections.IDictionary]) {
-        $entries = $EnvironmentConfig.GetEnumerator()
-    }
-    else {
-        $entries = $EnvironmentConfig.PSObject.Properties
-    }
-
-    foreach ($entry in $entries) {
-        if ($entry -is [System.Collections.DictionaryEntry]) {
-            $key = [string]$entry.Key
-            $value = $entry.Value
+    if ($EnvironmentConfig) {
+        if ($EnvironmentConfig -is [System.Collections.IDictionary]) {
+            $entries = $EnvironmentConfig.GetEnumerator()
         }
         else {
-            $key = [string]$entry.Name
-            $value = $entry.Value
+            $entries = $EnvironmentConfig.PSObject.Properties
         }
 
-        $key = $key.Trim()
-        if (-not $key) {
-            continue
-        }
-        if ($null -eq $value) {
-            continue
-        }
+        foreach ($entry in $entries) {
+            if ($entry -is [System.Collections.DictionaryEntry]) {
+                $key = [string]$entry.Key
+                $value = $entry.Value
+            }
+            else {
+                $key = [string]$entry.Name
+                $value = $entry.Value
+            }
 
-        $valueString = [string]$value
+            $key = $key.Trim()
+            if (-not $key -or $null -eq $value) {
+                continue
+            }
+            $values[$key] = [string]$value
+        }
+    }
+
+    if ($Overrides) {
+        foreach ($entry in $Overrides.GetEnumerator()) {
+            $key = ([string]$entry.Key).Trim()
+            if (-not $key -or $null -eq $entry.Value) {
+                continue
+            }
+            $values[$key] = [string]$entry.Value
+        }
+    }
+
+    foreach ($entry in $values.GetEnumerator()) {
         $args += "--environment"
-        $args += "$key=$valueString"
+        $args += "$($entry.Key)=$($entry.Value)"
     }
 
     return $args
@@ -269,7 +282,11 @@ if ($includeFilesConfig) {
 if ($includeFiles.Count -eq 0) {
     $includeFiles = @("index.py", "requirements.txt")
 }
-$environmentArgs = @(Get-EnvironmentArgs -EnvironmentConfig (Get-ObjectValue -Object $cfg -Key "environment"))
+$environmentArgs = @(
+    Get-EnvironmentArgs `
+        -EnvironmentConfig (Get-ObjectValue -Object $cfg -Key "environment") `
+        -Overrides $EnvironmentOverrides
+)
 $mountArgs = @(Get-MountArgs -MountsConfig (Get-ObjectValue -Object $cfg -Key "mounts"))
 
 Write-Host "Ensuring function '$functionNameResolved' exists..."

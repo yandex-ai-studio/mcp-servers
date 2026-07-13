@@ -23,6 +23,8 @@ Each MCP gateway tool forwards requests to one or more Yandex Cloud backends:
   Renders Markdown into PDF and returns `pdf_url` (inline data URL or bucket URL).
 - [arXiv](servers/arxiv/README.md)  
   Provides search and paper-details tools via two cloud functions under one gateway.
+- [Kaggle](servers/kaggle/README.md)
+  Searches public Kaggle datasets and returns detailed metadata with bounded file lists.
 - [Webdriver](servers/webdriver/README.md)  
   Fetches rendered web pages with Playwright/Chromium from a private serverless container.
 - [Weather](servers/weather/README.md)  
@@ -55,6 +57,7 @@ Typical flow per function-backed server:
    - `servers\grapher\funcdeploy.ps1`
    - `servers\markdownpdf\funcdeploy.ps1`
    - `servers\arxiv\funcdeploy.ps1`
+   - `servers\kaggle\funcdeploy.ps1`
 3. Update tool spec function IDs if needed.
 4. Deploy MCP gateway from server directory:
    - `.\mcpdeploy.ps1 --gateway-name <gateway-name> --env-file .env`
