@@ -1,4 +1,5 @@
 import json
+import os
 from datetime import date, datetime
 from enum import Enum
 from typing import Any, Dict, Iterable, List, Optional, Tuple
@@ -14,6 +15,7 @@ FILE_TYPE_ALLOWED = {"all", "csv", "sqlite", "json", "bigQuery", "parquet"}
 LICENSE_ALLOWED = {"all", "cc", "gpl", "odb", "other"}
 
 _API = None
+KAGGLE_CONFIG_DIR = "/tmp/.kaggle"
 
 
 def _json_response(payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -90,6 +92,10 @@ def _optional_enum(
 def _get_api() -> Any:
     global _API
     if _API is None:
+        # Kaggle creates its config directory while importing. Yandex Cloud
+        # Functions mounts the application directory read-only, so keep the
+        # client's writable state in the function's temporary filesystem.
+        os.environ["KAGGLE_CONFIG_DIR"] = KAGGLE_CONFIG_DIR
         from kaggle import api as kaggle_api
 
         _API = kaggle_api

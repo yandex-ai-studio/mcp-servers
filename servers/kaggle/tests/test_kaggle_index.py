@@ -1,5 +1,7 @@
 import importlib.util
 import json
+import os
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
@@ -232,3 +234,13 @@ def test_import_time_authentication_exit_is_sanitized(monkeypatch):
     monkeypatch.setattr(index, "_get_api", fail_auth)
     payload = _parse_body(index.handler({"query": "data"}, None))
     assert payload == {"error": "Kaggle authentication failed"}
+
+
+def test_get_api_redirects_kaggle_config_to_tmp_before_import(monkeypatch):
+    fake_api = object()
+    monkeypatch.setenv("KAGGLE_CONFIG_DIR", "/function/.config/kaggle")
+    monkeypatch.setitem(sys.modules, "kaggle", SimpleNamespace(api=fake_api))
+    monkeypatch.setattr(index, "_API", None)
+
+    assert index._get_api() is fake_api
+    assert os.environ["KAGGLE_CONFIG_DIR"] == "/tmp/.kaggle"
